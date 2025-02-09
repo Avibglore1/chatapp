@@ -1,17 +1,22 @@
 import React, { useContext } from 'react'
-import GrandParent from './GrandParent';
+import PageNotFound from '../PageNotFound';
+import Article from './Article';
+import {Routes,Route} from 'react-router-dom'
 
-const value=10;
+const bg = 'bg-yellow-500'
  const contextWrapper = React.createContext();
 function Context() {
    
   return (
     <>
-        <div>Context</div>  
-        <contextWrapper.Provider value={value}>
-        <GrandParent></GrandParent>
-        </contextWrapper.Provider>
-        
+    <div className='text-8xl'>Themebased</div>  
+    <contextWrapper.Provider value={bg}>
+        <Routes>
+            <Route path='/' element = {<Article></Article>}></Route>
+            <Route path='*' element = {<PageNotFound></PageNotFound>}></Route>
+        </Routes>
+    </contextWrapper.Provider>
+       
     </>
     
   )

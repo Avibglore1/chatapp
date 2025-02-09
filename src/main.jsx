@@ -6,7 +6,7 @@ import Context from './Components/examples/Context.jsx'
 
 createRoot(document.getElementById('root')).render(
   <BrowserRouter>
-    {/* <App /> */}
+    
     <Context></Context>
   </BrowserRouter>
 )

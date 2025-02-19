@@ -11,8 +11,7 @@ function Protectedroute(props) {
      return children
     }else{
       return  <Navigate to='/login' />
-    }
-    
+    }  
 }
 
 export default Protectedroute

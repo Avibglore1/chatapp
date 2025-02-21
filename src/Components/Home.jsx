@@ -12,39 +12,63 @@ function Home() {
   const [currentUserId, setCurrentUserId] = useState(null);
 
   useEffect(() => {
+    console.log("Home component mounted!");
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
+        console.log("User logged in:", user.uid);
         setCurrentUserId(user.uid);
       } else {
+        console.log("User logged out");
         setCurrentUserId(null);
         setSelectedUser(null);
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      console.log("Cleanup: Unsubscribing from auth listener");
+      unsubscribe();
+    };
   }, []);
+
+  useEffect(() => {
+    console.log("showProfile state changed:", showProfile);
+  }, [showProfile]);
 
   const handleUserSelect = (user) => {
     if (!currentUserId || user.id === currentUserId) return;
+    console.log("User selected:", user);
     setSelectedUser(user);
   };
 
   return (
-    <div className="flex h-screen relative">
+    <div className="flex h-screen">
       {/* Left Sidebar: Chat Panel */}
       <ChatPanel
-        onProfileClick={() => setShowProfile(true)}
+        onProfileClick={() => {
+          console.log("Profile button clicked!");
+          setShowProfile(true);
+        }}
         onSelectUser={handleUserSelect}
         currentUserId={currentUserId}
       />
 
       {/* Overlay Profile Panel */}
-      <Profile isOpen={showProfile} onBack={() => setShowProfile(false)} />
+      {showProfile && (
+        <>
+          <p>Profile Component Should Be Here</p>
+          <Profile onClose={() => setShowProfile(false)} />
+        </>
+      )}
 
       {/* Right Section: Chat or EmptyChat */}
-      <div className="flex-1">
+      <div className="flex-1 flex">
         {selectedUser && currentUserId ? (
-          <Chat user={selectedUser} currentUserId={currentUserId} onBack={() => setSelectedUser(null)} />
+          <Chat
+            user={selectedUser}
+            currentUserId={currentUserId}
+            onBack={() => setSelectedUser(null)}
+          />
         ) : (
           <EmptyChat />
         )}

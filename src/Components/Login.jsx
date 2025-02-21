@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { auth,db } from '../../firebase';
 import { GoogleAuthProvider,signInWithPopup } from 'firebase/auth';
 import { setDoc,doc } from "firebase/firestore";
+import { useAuth } from './AuthContext';
 
 async function createUser(authData){
   const userObj = authData.user;
@@ -18,12 +19,12 @@ async function createUser(authData){
 }
 function Login(props) {
   const navigate = useNavigate();
-  const {setIsLoggedIn} = props;
-  const login = async() =>{
+  const {login} = useAuth();
+  const loginClick = async() =>{
     const result = await signInWithPopup(auth, new GoogleAuthProvider);
-    console.log('Logged In')
+    console.log('Logged In');
     createUser(result);
-    setIsLoggedIn(true);
+    login();
     navigate('/')
   }
   return (
@@ -43,7 +44,7 @@ function Login(props) {
         <Fingerprint size={100} strokeWidth={2} className="text-gray-700" />
         <h2 className="text-lg font-semibold mt-5">Sign In</h2>
         <p className="text-center text-gray-400 text-sm mt-2">Sign in with your Google account <br /> to get started</p>
-        <button onClick={login} className="mt-7 px-4 py-2 bg-[#04a784] text-white rounded flex items-center gap-3">
+        <button onClick={loginClick} className="mt-7 px-4 py-2 bg-[#04a784] text-white rounded flex items-center gap-3">
           Sign in with Google <LogIn />
         </button>
       </div>

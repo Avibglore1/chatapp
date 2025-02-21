@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import { doc, updateDoc, arrayUnion, serverTimestamp, onSnapshot, setDoc, getDoc } from "firebase/firestore";
 import { db, auth } from "../../firebase";
+import { useTheme } from './ThemeContext';
 
 function Chat({ user, currentUserId }) {
+  const { theme } = useTheme();
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -10,6 +12,7 @@ function Chat({ user, currentUserId }) {
   const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
+  
 
   const getChatId = () => [currentUserId, user.id].sort().join("_");
 
@@ -25,8 +28,7 @@ function Chat({ user, currentUserId }) {
 
   useEffect(() => {
     if (!user?.id || !currentUserId) {
-      setError("Chat cannot be loaded");
-      setIsLoading(false);
+      setIsLoading(true); // Keep loading until a user is selected
       return;
     }
 
@@ -117,16 +119,33 @@ function Chat({ user, currentUserId }) {
   };
 
   if (error) {
-    return <div className="flex items-center justify-center h-full text-red-500">{error}</div>;
+    return (
+      <div className={`flex items-center justify-center h-full ${
+        theme === "dark" ? "bg-gray-800 text-red-400" : "bg-gray-50 text-red-500"
+      }`}>
+        {error}
+      </div>
+    );
   }
-
+  
   if (isLoading) {
-    return <div className="flex items-center justify-center h-full">Loading chat...</div>;
+    return (
+      <div className={`flex items-center justify-center h-full ${
+        theme === "dark" ? "bg-gray-800 text-white" : "bg-gray-50 text-black"
+      }`}>
+        <div className="flex items-center">
+          <svg className="animate-spin h-5 w-5 mr-3" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Loading chat...
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="flex flex-col h-full flex-1 bg-gray-50 relative"> 
-      {/* ✅ Updated Header with Fixed Position */}
       <header className="bg-gray-200 flex items-center shadow-sm p-3 w-full absolute top-0 left-0 z-0">
         <img
           src={user.profile_pic || "/default-avatar.png"}
@@ -136,34 +155,29 @@ function Chat({ user, currentUserId }) {
         <h1 className="text-lg font-semibold">{user.name}</h1>
       </header>
 
-      {/* Scrollable Messages Container */}
       <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 mt-[56px]">
         {messages.length === 0 ? (
           <div className="text-center text-gray-500 mt-4">No messages yet. Start the conversation!</div>
         ) : (
-          messages.map((msg, index) => {
-            const showSenderName = index === 0 || messages[index - 1].senderId !== msg.senderId;
-            return (
-              <div key={msg.id} className={`flex ${msg.senderId === currentUserId ? "justify-end" : "justify-start"}`}>
-                <div
-                  className={`max-w-[70%] rounded-lg p-3 ${
-                    msg.senderId === currentUserId
-                      ? "bg-blue-500 text-white rounded-br-none"
-                      : "bg-gray-200 text-gray-900 rounded-bl-none"
-                  }`}
-                >
-                  {showSenderName && <p className="text-sm font-medium mb-1">{msg.senderName}</p>}
-                  <p className="break-words">{msg.text}</p>
-                  <p className="text-xs mt-1 opacity-70">{formatTime(msg.timestamp)}</p>
-                </div>
+          messages.map((msg) => (
+            <div key={msg.id} className={`flex ${msg.senderId === currentUserId ? "justify-end" : "justify-start"}`}>
+              <div
+                className={`max-w-[70%] rounded-lg p-3 ${
+                  msg.senderId === currentUserId
+                    ? "bg-blue-500 text-white rounded-br-none"
+                    : "bg-gray-200 text-gray-900 rounded-bl-none"
+                }`}
+              >
+                {/* Removed sender name display completely */}
+                <p className="break-words">{msg.text}</p>
+                <p className="text-xs mt-1 opacity-70">{formatTime(msg.timestamp)}</p>
               </div>
-            );
-          })
+            </div>
+          ))
         )}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Fixed Message Input Form at Bottom */}
       <form onSubmit={sendMessage} className="sticky bottom-0 border-t p-4 bg-white shadow-md">
         <div className="flex space-x-2">
           <input

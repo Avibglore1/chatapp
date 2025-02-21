@@ -1,13 +1,17 @@
 import React, { useEffect, useState } from "react";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "../../firebase";
-import { Sun, CircleFadingPlus, MessageSquare, UserRound, Search } from "lucide-react";
+import { Sun, Moon, CircleFadingPlus, MessageSquare, UserRound, Search, X } from "lucide-react";
 import pic from "./../../public/gogglepic.png";
+import { useTheme } from "./ThemeContext"; // Import ThemeContext
 
 function ChatPanel({ onProfileClick, onSelectUser, currentUserId }) {
+  const { theme, toggleTheme } = useTheme();
   const [users, setUsers] = useState([]);
+  const [filteredUsers, setFilteredUsers] = useState([]);
   const [isLoading, setLoading] = useState(true);
   const [selectedUserId, setSelectedUserId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     const getUsers = async () => {
@@ -22,6 +26,7 @@ function ChatPanel({ onProfileClick, onSelectUser, currentUserId }) {
           .filter(user => user.id !== currentUserId);
 
         setUsers(usersData);
+        setFilteredUsers(usersData);
         setLoading(false);
       } catch (error) {
         console.error("Error fetching users:", error);
@@ -34,27 +39,44 @@ function ChatPanel({ onProfileClick, onSelectUser, currentUserId }) {
     }
   }, [currentUserId]);
 
+  useEffect(() => {
+    if (searchQuery.trim() === "") {
+      setFilteredUsers(users);
+    } else {
+      const query = searchQuery.toLowerCase();
+      const filtered = users.filter(user => 
+        user.name.toLowerCase().includes(query)
+      );
+      setFilteredUsers(filtered);
+    }
+  }, [searchQuery, users]);
+
   const handleUserSelect = (user) => {
     if (!currentUserId) return;
     if (user.id === currentUserId) return;
-
-    const chatId = currentUserId < user.id
-      ? `${currentUserId}_${user.id}`
-      : `${user.id}_${currentUserId}`;
 
     setSelectedUserId(user.id);
     onSelectUser(user);
   };
 
+  const handleClearSearch = () => {
+    setSearchQuery("");
+  };
+
   return (
-    <div className="w-[35%] h-screen border-r bg-white relative">
+    <div className={`w-[30%] h-screen border-r ${theme === "dark" ? "bg-gray-900 text-white" : "bg-white text-black"} relative`}>
       {/* Header inside ChatPanel */}
-      <header className="bg-gray-200 flex justify-between items-center shadow-sm p-3">
-        <button onClick={onProfileClick}>
-          <img src={pic} className="w-10 h-10 rounded-full object-cover" alt="Profile" />
-        </button>
+      <header className={`flex justify-between items-center shadow-sm p-3 ${theme === "dark" ? "bg-gray-800" : "bg-gray-200"}`}>
+      <button onClick={() => {
+  console.log("Profile button clicked!");
+  onProfileClick();
+}}>
+  <img src={pic} className="w-10 h-10 rounded-full object-cover" alt="Profile" />
+</button>
         <div className="flex gap-3">
-          <Sun />
+          <button onClick={toggleTheme}>
+            {theme === "dark" ? <Sun /> : <Moon />}
+          </button>
           <CircleFadingPlus />
           <MessageSquare />
           <UserRound />
@@ -62,38 +84,55 @@ function ChatPanel({ onProfileClick, onSelectUser, currentUserId }) {
       </header>
 
       {/* Search Bar */}
-      <div className="bg-white p-3">
-        <div className="flex bg-gray-200 gap-3 mb-3 p-2 shadow-sm rounded-sm">
-          <Search />
-          <p>Search</p>
+      <div className={`p-3 ${theme === "dark" ? "bg-gray-900" : "bg-white"}`}>
+        <div className={`flex items-center ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"} mb-3 p-2 shadow-sm rounded-sm`}>
+          <Search className="text-gray-500 mr-2" size={18} />
+          <input 
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search users"
+            className={`bg-transparent flex-1 outline-none text-sm ${theme === "dark" ? "text-white" : "text-black"}`}
+          />
+          {searchQuery && (
+            <button onClick={handleClearSearch} className="text-gray-500">
+              <X size={16} />
+            </button>
+          )}
         </div>
 
         {isLoading ? (
           <p className="text-center text-gray-500 py-4">Loading users...</p>
         ) : (
-          <ul>
-            {users.length === 0 ? (
-              <p className="text-center text-gray-500 py-4">No users found</p>
+          <div className="max-h-[calc(100vh-120px)] overflow-y-auto">
+            {filteredUsers.length === 0 ? (
+              <p className="text-center text-gray-500 py-4">
+                {searchQuery ? `No users matching "${searchQuery}"` : "No users found"}
+              </p>
             ) : (
-              users.map((user, index) => (
-                <React.Fragment key={user.id}>
-                  <li
-                    className={`flex gap-3 p-2 cursor-pointer transition 
-                    ${selectedUserId === user.id ? "bg-gray-200" : "hover:bg-gray-100"}`}
-                    onClick={() => handleUserSelect(user)}
-                  >
-                    <img
-                      src={user.profile_pic}
-                      className="w-8 h-8 rounded-full object-cover"
-                      alt="User"
-                    />
-                    <p>{user.name}</p>
-                  </li>
-                  {index !== users.length - 1 && <hr className="border-gray-300" />}
-                </React.Fragment>
-              ))
+              <ul>
+                {filteredUsers.map((user, index) => (
+                  <React.Fragment key={user.id}>
+                   <li
+  className={`flex gap-3 p-2 cursor-pointer transition 
+    ${selectedUserId === user.id 
+      ? (theme === "dark" ? "bg-gray-700" : "bg-gray-200") 
+      : (theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100")}`}
+  onClick={() => handleUserSelect(user)}
+>
+  <img
+    src={user.profile_pic}
+    className="w-8 h-8 rounded-full object-cover"
+    alt="User"
+  />
+  <p className={`${theme === "dark" ? "text-white" : "text-black"}`}>{user.name}</p>
+</li>
+                    {index !== filteredUsers.length - 1 && <hr className="border-gray-300" />}
+                  </React.Fragment>
+                ))}
+              </ul>
             )}
-          </ul>
+          </div>
         )}
       </div>
     </div>

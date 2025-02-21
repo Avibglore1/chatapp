@@ -12,8 +12,6 @@ function Home() {
   const [currentUserId, setCurrentUserId] = useState(null);
 
   useEffect(() => {
-    console.log("Home component mounted!");
-
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
         console.log("User logged in:", user.uid);
@@ -25,41 +23,32 @@ function Home() {
       }
     });
 
-    return () => {
-      console.log("Cleanup: Unsubscribing from auth listener");
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, []);
 
-  useEffect(() => {
-    console.log("showProfile state changed:", showProfile);
-  }, [showProfile]);
+  const handleProfileToggle = () => {
+    setShowProfile(prev => !prev);
+  };
 
   const handleUserSelect = (user) => {
     if (!currentUserId || user.id === currentUserId) return;
-    console.log("User selected:", user);
     setSelectedUser(user);
   };
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen relative">
       {/* Left Sidebar: Chat Panel */}
       <ChatPanel
-        onProfileClick={() => {
-          console.log("Profile button clicked!");
-          setShowProfile(true);
-        }}
+        onProfileClick={handleProfileToggle}
         onSelectUser={handleUserSelect}
         currentUserId={currentUserId}
       />
 
-      {/* Overlay Profile Panel */}
-      {showProfile && (
-        <>
-          <p>Profile Component Should Be Here</p>
-          <Profile onClose={() => setShowProfile(false)} />
-        </>
-      )}
+      {/* Profile Panel (Overlay) */}
+      <Profile 
+        isOpen={showProfile} 
+        onBack={handleProfileToggle}
+      />
 
       {/* Right Section: Chat or EmptyChat */}
       <div className="flex-1 flex">

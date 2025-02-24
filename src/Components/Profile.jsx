@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, Check, Edit } from "lucide-react";
+import { ArrowLeft, Check, Camera } from "lucide-react";
 import { signOut, onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "../../firebase";
-import { doc, setDoc, getDoc, onSnapshot } from "firebase/firestore";
+import { doc, setDoc, onSnapshot } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import { useTheme } from "./ThemeContext";
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 
 function Profile({ onBack, isOpen }) {
   const navigate = useNavigate();
@@ -15,8 +16,10 @@ function Profile({ onBack, isOpen }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [name, setName] = useState("");
   const [status, setStatus] = useState("");
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [isEditingStatus, setIsEditingStatus] = useState(false);
+  const [image, setImage] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [nameSuccess, setNameSuccess] = useState(false);
+  const [statusSuccess, setStatusSuccess] = useState(false);
 
   // Load user from local storage on mount
   useEffect(() => {
@@ -38,8 +41,8 @@ function Profile({ onBack, isOpen }) {
           if (docSnap.exists()) {
             const data = docSnap.data();
             setName(data.name || "");
-            setStatus(data.status || "");
-
+            setStatus(data.status || "Busy");
+            if (data.profilePic) setImage(data.profilePic); // Set profile image
             // Save to local storage
             localStorage.setItem("userData", JSON.stringify(data));
           }
@@ -56,26 +59,79 @@ function Profile({ onBack, isOpen }) {
     return () => unsubscribeAuth();
   }, []);
 
-  // Save Name
+  // Save Name with feedback
   const handleSaveName = async () => {
     if (currentUser) {
-      await setDoc(doc(db, "users", currentUser.uid), { name }, { merge: true });
-
-      // Save locally
-      localStorage.setItem("userData", JSON.stringify({ name, status }));
+      try {
+        await setDoc(doc(db, "users", currentUser.uid), { name }, { merge: true });
+        // Save locally
+        localStorage.setItem("userData", JSON.stringify({ name, status }));
+        
+        // Show success feedback
+        setNameSuccess(true);
+        setTimeout(() => {
+          setNameSuccess(false);
+        }, 1500);
+      } catch (error) {
+        console.error("Error saving name:", error);
+      }
     }
-    setIsEditingName(false);
   };
 
-  // Save Status
+  // Save Status with feedback
   const handleSaveStatus = async () => {
     if (currentUser) {
-      await setDoc(doc(db, "users", currentUser.uid), { status }, { merge: true });
-
-      // Save locally
-      localStorage.setItem("userData", JSON.stringify({ name, status }));
+      try {
+        await setDoc(doc(db, "users", currentUser.uid), { status }, { merge: true });
+        // Save locally
+        localStorage.setItem("userData", JSON.stringify({ name, status }));
+        
+        // Show success feedback
+        setStatusSuccess(true);
+        setTimeout(() => {
+          setStatusSuccess(false);
+        }, 1500);
+      } catch (error) {
+        console.error("Error saving status:", error);
+      }
     }
-    setIsEditingStatus(false);
+  };
+
+  const handleImageChange = (e) => {
+    if (e.target.files[0]) {
+      const selectedImage = e.target.files[0];
+      setImage(URL.createObjectURL(selectedImage)); // Show preview instantly
+      uploadImage(selectedImage); // Auto-upload
+    }
+  };
+  
+  const uploadImage = async (file) => {
+    if (!file || !currentUser) return;
+  
+    setUploading(true);
+    const storageRef = ref(getStorage(), `profileImages/${currentUser.uid}`);
+    const uploadTask = uploadBytesResumable(storageRef, file);
+  
+    uploadTask.on(
+      "state_changed",
+      null,
+      (error) => {
+        console.error("Upload error:", error);
+        setUploading(false);
+      },
+      async () => {
+        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+        
+        // Save URL to Firestore
+        await setDoc(doc(db, "users", currentUser.uid), { profilePic: downloadURL }, { merge: true });
+  
+        // Save locally
+        localStorage.setItem("userData", JSON.stringify({ ...JSON.parse(localStorage.getItem("userData")), profilePic: downloadURL }));
+  
+        setImage(downloadURL); // Update UI
+        setUploading(false);
+      }
+    );
   };
 
   // Logout Function
@@ -107,60 +163,101 @@ function Profile({ onBack, isOpen }) {
         </button>
         <h1 className="text-xl font-medium text-white">Profile</h1>
       </header>
-
       <div className="p-6 flex flex-col items-center">
-        <div className="w-36 h-36 rounded-full bg-gray-500 flex items-center justify-center mb-12 mt-24">
-          <span className="text-white text-6xl font-light">{name ? name.charAt(0).toUpperCase() : "A"}</span>
+        <div className="relative w-36 h-36 rounded-full bg-gray-500 flex items-center justify-center mb-12 mt-24 overflow-hidden">
+          {image ? (
+            <img src={image} alt="Profile" className="w-full h-full object-cover" />
+          ) : (
+            <span className="text-white text-6xl font-light">
+              {name ? name.charAt(0).toUpperCase() : "A"}
+            </span>
+          )}
+
+          {uploading && (
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+              <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          )}
+
+          {/* Camera Icon */}
+          <label 
+            htmlFor="fileInput" 
+            className="absolute bottom-2 right-2 bg-black/70 p-3 rounded-full cursor-pointer hover:opacity-80 transition-opacity"
+          >
+            <Camera className="text-white" size={24} />
+          </label>
+          
+          <input
+            type="file"
+            id="fileInput"
+            accept="image/*"
+            onChange={handleImageChange}
+            className="hidden"
+          />
         </div>
 
-        {/* Name Input */}
-        <div className="w-full mb-6">
+        {/* Name Input - Always editable with feedback */}
+        <div className="w-full mb-6 relative">
           <p className="text-sm mb-2" style={{ color: primaryColor }}>Your Name</p>
           <div className={`flex justify-between items-center p-3 border ${
             theme === "dark" ? "bg-gray-800 border-gray-700" : "bg-gray-100"
-          }`}>
+          } ${nameSuccess ? "border-green-500" : ""} transition-all duration-300`}>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              readOnly={!isEditingName}
               className={`w-full focus:outline-none ${
                 theme === "dark" ? "text-white bg-gray-800" : "text-gray-800 bg-gray-100"
-              } ${isEditingName ? "border-b border-gray-400" : ""}`}
+              } border-b border-gray-400`}
             />
-            <button onClick={isEditingName ? handleSaveName : () => setIsEditingName(true)}>
-              {isEditingName ? (
-                <Check size={20} style={{ color: primaryColor }} />
-              ) : (
-                <Edit size={20} style={{ color: primaryColor }} />
-              )}
+            <button 
+              onClick={handleSaveName}
+              className={`p-2 rounded-full transition-colors ${nameSuccess ? "bg-green-100" : "hover:bg-gray-200"}`}
+            >
+              <Check 
+                size={20} 
+                style={{ color: nameSuccess ? "#10B981" : primaryColor }} 
+                className={`transition-transform ${nameSuccess ? "scale-110" : ""}`}
+              />
             </button>
           </div>
+          {nameSuccess && (
+            <div className="absolute right-0 -bottom-6 text-green-500 text-sm font-medium">
+              Name saved successfully!
+            </div>
+          )}
         </div>
 
-        {/* Status Input */}
-        <div className="w-full mb-12">
+        {/* Status Input - Always editable with feedback */}
+        <div className="w-full mb-12 relative">
           <p className="text-sm mb-2" style={{ color: primaryColor }}>Status</p>
           <div className={`flex justify-between items-center p-3 border ${
             theme === "dark" ? "bg-gray-800 border-gray-700" : "bg-gray-100"
-          }`}>
+          } ${statusSuccess ? "border-green-500" : ""} transition-all duration-300`}>
             <input
               type="text"
               value={status}
               onChange={(e) => setStatus(e.target.value)}
-              readOnly={!isEditingStatus}
               className={`w-full focus:outline-none ${
                 theme === "dark" ? "text-white bg-gray-800" : "text-gray-800 bg-gray-100"
-              } ${isEditingStatus ? "border-b border-gray-400" : ""}`}
+              } border-b border-gray-400`}
             />
-            <button onClick={isEditingStatus ? handleSaveStatus : () => setIsEditingStatus(true)}>
-              {isEditingStatus ? (
-                <Check size={20} style={{ color: primaryColor }} />
-              ) : (
-                <Edit size={20} style={{ color: primaryColor }} />
-              )}
+            <button 
+              onClick={handleSaveStatus}
+              className={`p-2 rounded-full transition-colors ${statusSuccess ? "bg-green-100" : "hover:bg-gray-200"}`}
+            >
+              <Check 
+                size={20} 
+                style={{ color: statusSuccess ? "#10B981" : primaryColor }} 
+                className={`transition-transform ${statusSuccess ? "scale-110" : ""}`}
+              />
             </button>
           </div>
+          {statusSuccess && (
+            <div className="absolute right-0 -bottom-6 text-green-500 text-sm font-medium">
+              Status saved successfully!
+            </div>
+          )}
         </div>
 
         <div className="mt-auto mb-8 flex justify-center w-full">
